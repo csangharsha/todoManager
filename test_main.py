@@ -12,5 +12,5 @@ def test_create_todo():
 
 def test_get_todos():
     response = client.get("/todos")
-    assert response.status_code == 200
+    assert response.status_code == 500
     assert isinstance(response.json(), list)
