@@ -17,6 +17,7 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
       
       - name: Install Dependencies
         run: |
@@ -56,4 +57,30 @@ jobs:
           tags: | 
             ghcr.io/${{ github.repository_owner }}/todo-manager:latest
             ghcr.io/${{ github.repository_owner }}/todo-manager:${{ github.sha }}
+          cache-to: type=gha
+          cache-from: type=gha, mode=max
 
+  deploy:
+    needs: build-docker
+    runs-on: ubuntu-latest
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Deploy to AWS EC2 via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Login into GHCR on the server (using a token)
+            # pull the latest image built by your CI Pipeline
+            docker pull ghcr.io/${{ github.repository_owner }}/todo-manager:latest
+
+            # Stop and remove the old container if it exists
+            docker stop todo-api || true
+            docker rm todo-api || true
+
+            # 4. Run the new container, mapping port 80 to FastAPI' port 8000
+            docker run -d --name todo-api -p 80:8000 ghcr.io/${{ github.repository_owner}}/todo-manager:latest
